@@ -24,9 +24,11 @@ pub mod data {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "snake_case")]
+    #[serde(untagged)]
     pub enum ChannelKind {
         Text,
         Voice,
+        IFrame(String),
     }
 }
 
