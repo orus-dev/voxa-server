@@ -57,6 +57,7 @@ impl PluginLoader {
             .get(&plugin_json.id)
             .is_none()
         {}
+        LOGGER.info(format!("Loaded {}", plugin_json.id));
         Plugin(
             self.plugin_clients
                 .lock()
@@ -70,11 +71,9 @@ impl PluginLoader {
 
     pub fn start_server(&self) {
         let plugin_clients = self.plugin_clients.clone();
+        let listener = TcpListener::bind("0.0.0.0:7243").unwrap();
 
         std::thread::spawn(move || {
-            let listener = TcpListener::bind("0.0.0.0:7243").unwrap();
-            LOGGER.info("Server listening at 0.0.0.0:7243");
-
             for stream in listener.incoming() {
                 let mut stream = stream.unwrap();
                 let mut s = String::new();

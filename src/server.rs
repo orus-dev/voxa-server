@@ -67,6 +67,10 @@ impl Server {
     }
 
     pub fn run(self: &Arc<Self>) -> crate::Result<()> {
+        // Start plugin loader
+        Self::LOGGER.info("Starting loader");
+        self.plugin_loader.start_server();
+
         // Load plugins
         Self::LOGGER.info("Loading plugins");
         for entry in fs::read_dir(self.root.join("plugins"))? {
