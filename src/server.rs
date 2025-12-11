@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     logger, types,
-    utils::{self, client::Client, plugin::DynPlugin},
+    utils::{self, client::Client},
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -23,7 +23,6 @@ pub struct ServerConfig {
 pub struct Server {
     pub root: PathBuf,
     pub config: ServerConfig,
-    pub plugins: Mutex<Vec<DynPlugin>>,
     pub clients: Mutex<HashSet<Client>>,
     pub db: utils::database::Database,
 }
@@ -56,7 +55,6 @@ impl Server {
     pub fn new_config(root: &Path, config: ServerConfig) -> Arc<Self> {
         Arc::new(Self {
             db: utils::database::Database::new(&config).unwrap(),
-            plugins: Mutex::new(Vec::new()),
             root: root.to_path_buf(),
             config,
             clients: Mutex::new(HashSet::new()),
@@ -72,9 +70,6 @@ impl Server {
         )?;
 
         // Initialize plugins
-        for plugin in self.plugins.lock().unwrap().iter_mut() {
-            plugin.init(self);
-        }
 
         // Start server
         let listener = TcpListener::bind(format!("0.0.0.0:{}", self.config.port))?;
@@ -167,11 +162,11 @@ impl Server {
         'outer: loop {
             let req = client.read()?;
             if let Some(r) = &req {
-                for p in self.plugins.lock().unwrap().iter_mut() {
-                    if p.on_request(r, client, self) {
-                        continue 'outer;
-                    }
-                }
+                // for p in self.plugins.lock().unwrap().iter_mut() {
+                //     if p.on_request(r, client, self) {
+                //         continue 'outer;
+                //     }
+                // }
 
                 self.wrap_err(&client, self.call_request(r, &client))?;
             }

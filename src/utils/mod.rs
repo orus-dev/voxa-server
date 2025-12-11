@@ -3,5 +3,4 @@ pub mod database;
 #[cfg(feature = "loader")]
 pub mod loader;
 pub mod logger;
-pub mod plugin;
 pub mod vfs;
