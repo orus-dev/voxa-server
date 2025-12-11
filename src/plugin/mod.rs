@@ -2,7 +2,7 @@ pub mod loader;
 pub mod types;
 
 use std::{
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Write},
     net::TcpStream,
 };
 

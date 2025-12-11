@@ -1,9 +1,14 @@
-use crate::{logger, plugin::Plugin};
-use serde::{Deserialize, Serialize};
+use crate::{
+    logger,
+    plugin::{
+        Plugin,
+        types::{PluginHandshake, PluginJson},
+    },
+};
 use std::{
     collections::HashMap,
     fs,
-    io::{BufRead, BufReader, Read},
+    io::{BufRead, BufReader},
     net::{TcpListener, TcpStream},
     path::Path,
     process::Command,
@@ -11,20 +16,6 @@ use std::{
 };
 
 logger!(LOGGER "Plugin Loader");
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PluginJson {
-    pub id: String,
-    pub version: String,
-    pub supported_versions: Vec<String>,
-    pub file: String,
-    pub args: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PluginHandshake {
-    pub id: String,
-}
 
 pub struct PluginLoader {
     plugin_clients: Arc<Mutex<HashMap<String, TcpStream>>>,
