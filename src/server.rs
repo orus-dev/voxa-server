@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     logger,
-    plugin::loader::PluginLoader,
+    plugin::{Plugin, loader::PluginLoader, types::LoaderMessage},
     types,
     utils::{self, client::Client},
 };
@@ -27,8 +27,8 @@ pub struct Server {
     pub root: PathBuf,
     pub config: ServerConfig,
     pub clients: Mutex<HashSet<Client>>,
+    pub plugins: Mutex<Vec<Plugin>>,
     pub db: utils::database::Database,
-    pub plugin_loader: PluginLoader,
 }
 
 impl Default for ServerConfig {
@@ -62,14 +62,15 @@ impl Server {
             root: root.to_path_buf(),
             config,
             clients: Mutex::new(HashSet::new()),
-            plugin_loader: PluginLoader::new(),
+            plugins: Mutex::new(Vec::new()),
         })
     }
 
     pub fn run(self: &Arc<Self>) -> crate::Result<()> {
         // Start plugin loader
+        let plugin_loader = PluginLoader::new();
         Self::LOGGER.info("Starting loader");
-        self.plugin_loader.start_server();
+        plugin_loader.start_server();
 
         // Load plugins
         Self::LOGGER.info("Loading plugins");
@@ -78,7 +79,7 @@ impl Server {
             let path = entry.path();
 
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                self.plugin_loader.load(&path);
+                self.plugins.lock().unwrap().push(plugin_loader.load(&path));
             }
         }
         Self::LOGGER.info("Plugins loaded");
@@ -174,14 +175,12 @@ impl Server {
 
     fn handle_client(self: &Arc<Self>, client: &Client) -> anyhow::Result<()> {
         // The main req/res loop
-        'outer: loop {
+        loop {
             let req = client.read()?;
             if let Some(r) = &req {
-                // for p in self.plugins.lock().unwrap().iter_mut() {
-                //     if p.on_request(r, client, self) {
-                //         continue 'outer;
-                //     }
-                // }
+                for p in self.plugins.lock().unwrap().iter_mut() {
+                    p.send(LoaderMessage::Request(r.clone()));
+                }
 
                 self.wrap_err(&client, self.call_request(r, &client))?;
             }

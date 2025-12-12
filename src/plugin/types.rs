@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::types::message::{ClientMessage, WsMessage};
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PluginJson {
     pub id: String,
@@ -14,9 +16,11 @@ pub struct PluginHandshake {
     pub id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", content = "params", rename_all = "snake_case")]
-pub enum LoaderMessage {}
+pub enum LoaderMessage {
+    Request(WsMessage<ClientMessage>),
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "params", rename_all = "snake_case")]
