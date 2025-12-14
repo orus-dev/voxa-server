@@ -11,7 +11,7 @@ use crate::plugin::types::{LoaderMessage, PluginMessage};
 pub struct Plugin(TcpStream, BufReader<TcpStream>);
 
 impl Plugin {
-    pub fn send(&mut self, m: LoaderMessage) {
+    pub fn send(&mut self, m: &LoaderMessage) {
         self.0
             .write(serde_json::to_string(&m).unwrap().as_bytes())
             .unwrap();

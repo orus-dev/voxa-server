@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use crate::{server::Server, types, utils::client::Client};
+use serde_json::ser;
+
+use crate::{plugin::types::LoaderMessage, server::Server, types, utils::client::Client};
 
 crate::logger!(LOGGER "Message Manager");
 
@@ -42,6 +44,11 @@ pub fn send(
                 .expect("Failed to broadcast");
         });
     }
+
+    server.send_plugin_message(&LoaderMessage::MessageSent {
+        user_id: client.get_uuid().unwrap_or_default(),
+        msg: msg,
+    });
 
     Ok(())
 }
