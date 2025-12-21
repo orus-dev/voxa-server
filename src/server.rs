@@ -118,7 +118,10 @@ impl Server {
         let listener = TcpListener::bind(format!("0.0.0.0:{}", self.config.port))?;
         Self::LOGGER.info(format!("Server listening at 0.0.0.0:{}", self.config.port));
 
-        println!("{WELCOME}\nversion {}\n", env!("CARGO_PKG_VERSION"));
+        println!(
+            "{WELCOME}\nversion {}\nType 'help' to see available commands.",
+            env!("CARGO_PKG_VERSION")
+        );
 
         for stream in listener.incoming() {
             match stream {

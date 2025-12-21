@@ -7,6 +7,21 @@ use crate::{logger, plugin::loader::PluginLoader, server::Server};
 
 logger!(LOGGER "CLI");
 
+macro_rules! commands {
+    (($cmdi:expr) $($cmd:literal $desc:literal => $body:block)*) => {
+        match $cmdi {
+            "help" => {
+                LOGGER.info("List of commands:");
+                $(
+                    println!("\x1b[34m{}\x1b[0m: {}", $cmd, format!($desc));
+                )*
+            },
+            $($cmd => $body)*
+            _ => LOGGER.error(format!("Command not found: {}", $cmdi)),
+        }
+    };
+}
+
 pub fn parse_args(input: &str) -> Vec<String> {
     let mut args = Vec::new();
     let mut current = String::new();
@@ -69,7 +84,7 @@ pub fn start_cli(server: Arc<Server>, plugin_loader: PluginLoader) {
         let mut rl = DefaultEditor::new().unwrap();
 
         loop {
-            let line = match rl.readline("> ") {
+            let line = match rl.readline("\n> ") {
                 Ok(line) => {
                     rl.add_history_entry(line.as_str()).ok();
                     line
@@ -87,8 +102,9 @@ pub fn start_cli(server: Arc<Server>, plugin_loader: PluginLoader) {
                 continue;
             }
 
-            match args[0].as_str() {
-                "install" => {
+            commands! {
+                (args[0].as_str())
+                "install" "Installs the specified plugin .vxp package" => {
                     if require_args(&args, &["<path.vxp>"]) {
                         let path = PathBuf::from_str(&args[1]).unwrap();
                         if path.extension().and_then(|s| s.to_str()) == Some("vxp") {
@@ -105,20 +121,20 @@ pub fn start_cli(server: Arc<Server>, plugin_loader: PluginLoader) {
                         }
                     }
                 }
-                "load" => {
+                "load" "loads a plugin that has been installed" => {
                     if require_args(&args, &["<plugin-dir>"]) {
                         plugin_loader.load(&server.root.join("plugins").join(&args[1]));
                     }
                 }
-                "ping" => {
-                    LOGGER.info("pong");
-                }
-                "shutdown" => {
+                "shutdown" "Softly shuts the server down, may not fully shut everything down" => {
                     server.shutdown();
                     break;
                 }
-                _ => LOGGER.error(format!("Command not found: {}", args[0])),
-            }
+
+                "ping" "replies with pong" => {
+                    LOGGER.info("pong");
+                }
+            };
         }
     });
 }
