@@ -31,6 +31,8 @@ pub enum LoaderMessage {
         user_id: String,
         msg: Message,
     },
+
+    Shutdown,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

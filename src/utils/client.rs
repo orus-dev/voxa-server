@@ -346,6 +346,11 @@ impl Client {
     pub fn set_uuid(&mut self, uuid: &str) {
         self.1 = Some(uuid.to_string())
     }
+
+    pub fn close(&self) -> crate::Result<()> {
+        self.0.shutdown(std::net::Shutdown::Both)?;
+        Ok(())
+    }
 }
 
 impl Clone for Client {

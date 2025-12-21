@@ -3,7 +3,10 @@ use std::{
     fs::{self},
     net::{TcpListener, TcpStream},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use crate::{
@@ -22,13 +25,13 @@ pub struct ServerConfig {
     pub channels: Vec<types::data::Channel>,
 }
 
-#[allow(dead_code)]
 pub struct Server {
     pub root: PathBuf,
     pub config: ServerConfig,
     pub clients: Mutex<HashSet<Client>>,
     pub plugins: Mutex<Vec<Plugin>>,
     pub db: utils::database::Database,
+    pub shutting_down: AtomicBool,
 }
 
 impl Default for ServerConfig {
@@ -63,6 +66,7 @@ impl Server {
             config,
             clients: Mutex::new(HashSet::new()),
             plugins: Mutex::new(Vec::new()),
+            shutting_down: AtomicBool::new(false),
         })
     }
 
@@ -182,7 +186,7 @@ impl Server {
 
     fn handle_client(self: &Arc<Self>, client: &Client) -> crate::Result<()> {
         // The main req/res loop
-        loop {
+        while !self.shutting_down.load(Ordering::SeqCst) {
             let req = client.read()?;
             if let Some(r) = &req {
                 self.send_plugin_message(&LoaderMessage::Request {
@@ -192,6 +196,7 @@ impl Server {
                 self.wrap_err(&client, self.call_request(r, &client))?;
             }
         }
+        Ok(())
     }
 
     /// When there is a error it removes the client
@@ -216,5 +221,30 @@ impl Server {
             p.send(msg)?;
         }
         Ok(())
+    }
+
+    pub fn shutdown(self: &Arc<Self>) {
+        Self::LOGGER.info("Server shutting down...");
+
+        // Signal shutdown
+        self.shutting_down.store(true, Ordering::SeqCst);
+
+        // Disconnect clients
+        let clients = self.clients.lock().unwrap();
+        for client in clients.iter() {
+            let _ = client.send(types::message::ServerMessage::Shutdown {
+                message: format!("Server shutting down... we'll be back shortly"),
+            });
+            let _ = client.close();
+        }
+
+        // Stop plugins
+        for plugin in self.plugins.lock().unwrap().iter_mut() {
+            let _ = plugin.stop();
+        }
+
+        Self::LOGGER.info("Shutdown complete");
+        Self::LOGGER.info("Exiting process..");
+        std::process::exit(0);
     }
 }

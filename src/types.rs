@@ -115,6 +115,10 @@ pub mod message {
             user_id: Author,
             channel_id: String,
         },
+
+        Shutdown {
+            message: String,
+        },
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]

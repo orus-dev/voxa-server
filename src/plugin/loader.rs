@@ -33,11 +33,13 @@ impl PluginLoader {
         let plugin_json: PluginJson = serde_json::from_str(&json_string).unwrap();
         LOGGER.info(format!("Loading {}", plugin_json.id));
 
-        Command::new(plugin_json.file)
-            .args(plugin_json.args)
-            .current_dir(path)
-            .spawn()
-            .unwrap();
+        let child = Arc::new(Mutex::new(
+            Command::new(plugin_json.file)
+                .args(plugin_json.args)
+                .current_dir(path)
+                .spawn()
+                .unwrap(),
+        ));
 
         while self
             .plugin_clients
@@ -59,6 +61,7 @@ impl PluginLoader {
             stream: a.try_clone().unwrap(),
             reader: BufReader::new(a),
             id: plugin_json.id,
+            child,
         }
     }
 
@@ -88,6 +91,7 @@ impl Clone for Plugin {
             stream: self.stream.try_clone().unwrap(),
             reader: BufReader::new(self.stream.try_clone().unwrap()),
             id: self.id.clone(),
+            child: self.child.clone(),
         }
     }
 }

@@ -113,6 +113,10 @@ pub fn start_cli(server: Arc<Server>, plugin_loader: PluginLoader) {
                 "ping" => {
                     LOGGER.info("pong");
                 }
+                "shutdown" => {
+                    server.shutdown();
+                    break;
+                }
                 _ => LOGGER.error(format!("Command not found: {}", args[0])),
             }
         }

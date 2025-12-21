@@ -4,7 +4,8 @@ pub mod types;
 use std::{
     io::{BufRead, BufReader, Write},
     net::TcpStream,
-    sync::Arc,
+    process::Child,
+    sync::{Arc, Mutex},
 };
 
 use crate::{
@@ -17,6 +18,7 @@ pub struct Plugin {
     stream: TcpStream,
     reader: BufReader<TcpStream>,
     id: String,
+    child: Arc<Mutex<Child>>,
 }
 
 impl Plugin {
@@ -59,5 +61,11 @@ impl Plugin {
                 }
             }
         }
+    }
+
+    pub fn stop(&mut self) {
+        self.send(&LoaderMessage::Shutdown).unwrap();
+        self.stream.shutdown(std::net::Shutdown::Both).unwrap();
+        self.child.lock().unwrap().kill().unwrap();
     }
 }
