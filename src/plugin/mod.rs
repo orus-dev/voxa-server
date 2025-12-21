@@ -69,4 +69,8 @@ impl Plugin {
         self.child.lock().unwrap().kill()?;
         Ok(())
     }
+
+    pub fn get_id(&self) -> String {
+        self.id.clone()
+    }
 }
