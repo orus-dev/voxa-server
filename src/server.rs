@@ -26,7 +26,7 @@ use crate::{
     cli, logger,
     plugin::{Plugin, loader::PluginLoader, types::LoaderMessage},
     types,
-    utils::{self, client::Client},
+    utils::{self, auth, client::Client},
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -106,6 +106,9 @@ impl Server {
 
         // Initialize plugins
         Self::LOGGER.info("Initializing plugins");
+
+        Self::LOGGER.info("Authenticating");
+        auth::test(self)?;
 
         // Initialize CLI
         Self::LOGGER.info("Initializing CLI");

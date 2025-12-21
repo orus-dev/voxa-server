@@ -26,3 +26,14 @@ pub fn auth(server: &Arc<Server>, client: &mut Client, token: &str) -> crate::Re
     LOGGER.info(format!("{} successfully authenticated", api_res.user_id));
     Ok(api_res.user_id)
 }
+
+pub fn test(server: &Arc<Server>) -> crate::Result<()> {
+    ureq::get(format!(
+        "https://vxchat.netlify.app/api/test-auth?key={}&id={}",
+        server.config.server_key, server.config.server_id
+    ))
+    .call()
+    .context("Failed to authenticate")?;
+
+    Ok(())
+}
