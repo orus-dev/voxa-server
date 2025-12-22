@@ -3,7 +3,7 @@ pub mod message;
 use std::sync::Arc;
 
 use crate::{
-    Server,
+    server::Server,
     types::message::{ClientMessage, WsMessage},
     utils::client::Client,
 };

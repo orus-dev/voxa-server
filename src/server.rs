@@ -1,21 +1,33 @@
 use std::{
     collections::HashSet,
+    fs::{self},
     net::{TcpListener, TcpStream},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
-pub mod auth;
-pub mod macros;
-pub mod requests;
-pub mod types;
-pub mod utils;
+const WELCOME: &str = "
 
-pub use anyhow::Context as ErrorContext;
-pub use anyhow::Result;
+$$\\    $$\\  $$$$$$\\  $$\\   $$\\  $$$$$$\\  
+$$ |   $$ |$$  __$$\\ $$ |  $$ |$$  __$$\\ 
+$$ |   $$ |$$ /  $$ |\\$$\\ $$  |$$ /  $$ |
+\\$$\\  $$  |$$ |  $$ | \\$$$$  / $$$$$$$$ |
+ \\$$\\$$  / $$ |  $$ | $$  $$<  $$  __$$ |
+  \\$$$  /  $$ |  $$ |$$  /\\$$\\ $$ |  $$ |
+   \\$  /    $$$$$$  |$$ /  $$ |$$ |  $$ |
+    \\_/     \\______/ \\__|  \\__|\\__|  \\__|
 
-use crate::{utils::client::Client, utils::plugin::DynPlugin};
-pub use once_cell;
+";
+
+use crate::{
+    cli, logger,
+    plugin::{Plugin, loader::PluginLoader, types::LoaderMessage},
+    types,
+    utils::{self, auth, client::Client},
+};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ServerConfig {
@@ -26,13 +38,13 @@ pub struct ServerConfig {
     pub channels: Vec<types::data::Channel>,
 }
 
-#[allow(dead_code)]
 pub struct Server {
-    root: PathBuf,
-    config: ServerConfig,
-    plugins: Mutex<Vec<DynPlugin>>,
-    clients: Mutex<HashSet<Client>>,
+    pub root: PathBuf,
+    pub config: ServerConfig,
+    pub clients: Mutex<HashSet<Client>>,
+    pub plugins: Mutex<Vec<Plugin>>,
     pub db: utils::database::Database,
+    pub shutting_down: AtomicBool,
 }
 
 impl Default for ServerConfig {
@@ -40,8 +52,8 @@ impl Default for ServerConfig {
         Self {
             port: 7080,
             server_name: format!("Server Name"),
-            server_id: format!("offline-server"),
-            server_key: format!(""),
+            server_id: format!("important"),
+            server_key: format!("important"),
             channels: Vec::new(),
         }
     }
@@ -60,36 +72,44 @@ impl ServerConfig {
 impl Server {
     logger!(LOGGER "Server");
 
-    pub fn new(root: &Path) -> Arc<Self> {
-        Self::new_config(root, ServerConfig::default())
-    }
-
     pub fn new_config(root: &Path, config: ServerConfig) -> Arc<Self> {
         Arc::new(Self {
             db: utils::database::Database::new(&config).unwrap(),
-            plugins: Mutex::new(Vec::new()),
             root: root.to_path_buf(),
             config,
             clients: Mutex::new(HashSet::new()),
+            plugins: Mutex::new(Vec::new()),
+            shutting_down: AtomicBool::new(false),
         })
     }
 
-    pub fn run(self: &Arc<Self>) -> Result<()> {
+    pub fn run(self: &Arc<Self>) -> crate::Result<()> {
+        // Start plugin loader
+        let plugin_loader = PluginLoader::new();
+        Self::LOGGER.info("Starting loader");
+        plugin_loader.start_server();
+
         // Load plugins
-        #[cfg(feature = "loader")]
-        utils::loader::load_plugins(
-            &mut *self.plugins.lock().unwrap(),
-            &self.root.join("./plugins"),
-        )?;
+        plugin_loader.load_all(self);
 
         // Initialize plugins
-        for plugin in self.plugins.lock().unwrap().iter_mut() {
-            plugin.init(self);
-        }
+        Self::LOGGER.info("Initializing plugins");
+
+        Self::LOGGER.info("Authenticating");
+        auth::test(self)?;
+
+        // Initialize CLI
+        Self::LOGGER.info("Initializing CLI");
+        cli::start_cli(self.clone(), plugin_loader);
 
         // Start server
         let listener = TcpListener::bind(format!("0.0.0.0:{}", self.config.port))?;
         Self::LOGGER.info(format!("Server listening at 0.0.0.0:{}", self.config.port));
+
+        println!(
+            "{WELCOME}\nversion {}\nType 'help' to see available commands.",
+            env!("CARGO_PKG_VERSION")
+        );
 
         for stream in listener.incoming() {
             match stream {
@@ -120,11 +140,7 @@ impl Server {
         Ok(())
     }
 
-    pub fn add_plugin(self: &Arc<Self>, plugin: DynPlugin) {
-        self.plugins.lock().unwrap().push(plugin);
-    }
-
-    fn init_client(self: &Arc<Self>, stream: TcpStream) -> anyhow::Result<Client> {
+    fn init_client(self: &Arc<Self>, stream: TcpStream) -> crate::Result<Client> {
         Self::LOGGER.info(format!("New connection: {}", stream.peer_addr()?));
         // Initialize client
         let mut client = Client::new(stream)?;
@@ -146,7 +162,7 @@ impl Server {
                 last_message,
                 ..
             })) => {
-                let auth_res = auth::auth(self, &mut client, &auth_token);
+                let auth_res = utils::auth::auth(self, &mut client, &auth_token);
                 let uuid = self.wrap_err(&client, auth_res)?;
                 self.wrap_err(
                     &client,
@@ -177,20 +193,19 @@ impl Server {
         Ok(client)
     }
 
-    fn handle_client(self: &Arc<Self>, client: &Client) -> anyhow::Result<()> {
+    fn handle_client(self: &Arc<Self>, client: &Client) -> crate::Result<()> {
         // The main req/res loop
-        'outer: loop {
+        while !self.shutting_down.load(Ordering::SeqCst) {
             let req = client.read()?;
             if let Some(r) = &req {
-                for p in self.plugins.lock().unwrap().iter_mut() {
-                    if p.on_request(r, client, self) {
-                        continue 'outer;
-                    }
-                }
-
+                self.send_plugin_message(&LoaderMessage::Request {
+                    user_id: client.get_uuid().unwrap_or_default(),
+                    msg: r.clone(),
+                })?;
                 self.wrap_err(&client, self.call_request(r, &client))?;
             }
         }
+        Ok(())
     }
 
     /// When there is a error it removes the client
@@ -208,5 +223,39 @@ impl Server {
         }
 
         res
+    }
+
+    pub fn send_plugin_message(self: &Arc<Self>, msg: &LoaderMessage) -> crate::Result<()> {
+        for p in self.plugins.lock().unwrap().iter_mut() {
+            p.send(msg)?;
+        }
+        Ok(())
+    }
+
+    pub fn shutdown(self: &Arc<Self>) {
+        Self::LOGGER.info("Server shutting down...");
+
+        // Signal shutdown
+        self.shutting_down.store(true, Ordering::SeqCst);
+
+        // Disconnect clients
+        let clients = self.clients.lock().unwrap();
+        for client in clients.iter() {
+            let _ = client.send(types::message::ServerMessage::Shutdown {
+                message: format!("Server shutting down... we'll be back shortly"),
+            });
+            let _ = client.close();
+        }
+
+        // Stop plugins
+        for plugin in self.plugins.lock().unwrap().iter_mut() {
+            if let Err(e) = plugin.stop() {
+                Self::LOGGER.warn(e.context("Couldn't stop plugin"));
+            }
+        }
+
+        Self::LOGGER.info("Shutdown complete");
+        Self::LOGGER.info("Exiting process..");
+        std::process::exit(0);
     }
 }

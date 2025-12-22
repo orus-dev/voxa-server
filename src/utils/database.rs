@@ -52,7 +52,7 @@ impl Database {
     }
 
     /// Delete a message from the DB
-    pub fn delete_message(&self, message_id: usize) -> Result<()> {
+    pub fn delete_message(&self, message_id: i64) -> Result<()> {
         self.0
             .execute("DELETE FROM chat WHERE id = ?1;", params![message_id])?;
 
@@ -60,7 +60,7 @@ impl Database {
     }
 
     /// Delete a message from the DB
-    pub fn edit_message(&self, message_id: usize, contents: &str) -> Result<()> {
+    pub fn edit_message(&self, message_id: i64, contents: &str) -> Result<()> {
         self.0.execute(
             "UPDATE table_name
                 SET contents = ?2
@@ -73,7 +73,7 @@ impl Database {
     }
 
     /// Get a message by its ID
-    pub fn get_message_by_id(&self, message_id: &str) -> Result<Option<Message>> {
+    pub fn get_message_by_id(&self, message_id: i64) -> Result<Option<Message>> {
         let mut stmt = self.0.prepare(
             "SELECT id, channel_id, user_id, contents, timestamp
          FROM chat
@@ -104,7 +104,7 @@ impl Database {
     }
 
     /// Get all messages with an ID greater than the given one
-    pub fn get_messages_after_id(&self, message_id: usize) -> Result<Vec<Message>> {
+    pub fn get_messages_after_id(&self, message_id: i64) -> Result<Vec<Message>> {
         let mut stmt = self.0.prepare(
             "SELECT id, channel_id, user_id, contents, timestamp
          FROM chat

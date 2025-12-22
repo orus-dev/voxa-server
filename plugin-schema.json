@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "id",
+    "version",
+    "supported_versions",
+    "file",
+    "args"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path or URL to the plugin schema"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique plugin identifier",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "description": "Plugin version",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "supported_versions": {
+      "type": "array",
+      "description": "List of supported host versions",
+      "items": {
+        "type": "string"
+      }
+    },
+    "file": {
+      "type": "string",
+      "description": "Executable or runtime used to launch the plugin"
+    },
+    "args": {
+      "type": "array",
+      "description": "Arguments passed to the executable",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

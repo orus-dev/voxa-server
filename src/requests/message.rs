@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use crate::{Server, types, utils::client::Client};
+use anyhow::anyhow;
+
+use crate::{plugin::types::LoaderMessage, server::Server, types, utils::client::Client};
 
 crate::logger!(LOGGER "Message Manager");
 
@@ -43,20 +45,43 @@ pub fn send(
         });
     }
 
+    server.send_plugin_message(&LoaderMessage::MessageSent {
+        user_id: client.get_uuid().unwrap_or_default(),
+        msg: msg,
+    })?;
+
     Ok(())
 }
 
 pub fn edit(
-    _server: &Arc<Server>,
-    _client: &Client,
-    message_id: usize,
+    server: &Arc<Server>,
+    client: &Client,
+    message_id: i64,
     new_contents: &str,
 ) -> crate::Result<()> {
     LOGGER.info(format!("EditMessage {message_id}: {new_contents}"));
+    let Some(msg) = server.db.get_message_by_id(message_id)? else {
+        return Err(anyhow!("Message does not exist"));
+    };
+
+    if msg.from != client.get_uuid()? {
+        return Err(anyhow!("You are not the author of this message"));
+    }
+
+    server.db.edit_message(message_id, new_contents)?;
     Ok(())
 }
 
-pub fn delete(_server: &Arc<Server>, _client: &Client, message_id: usize) -> crate::Result<()> {
+pub fn delete(server: &Arc<Server>, client: &Client, message_id: i64) -> crate::Result<()> {
     LOGGER.info(format!("DeleteMessage {message_id}"));
+    let Some(msg) = server.db.get_message_by_id(message_id)? else {
+        return Err(anyhow!("Message does not exist"));
+    };
+
+    if msg.from != client.get_uuid()? {
+        return Err(anyhow!("You are not the author of this message"));
+    }
+
+    server.db.delete_message(message_id)?;
     Ok(())
 }

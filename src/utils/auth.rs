@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
+use anyhow::Context;
 use serde::Deserialize;
 
-use crate::{ErrorContext, logger};
-use crate::{Server, utils::client::Client};
+use crate::logger;
+use crate::server::Server;
+use crate::utils::client::Client;
 
 logger!(LOGGER "Auth");
 
@@ -23,4 +25,15 @@ pub fn auth(server: &Arc<Server>, client: &mut Client, token: &str) -> crate::Re
     client.set_uuid(&api_res.user_id);
     LOGGER.info(format!("{} successfully authenticated", api_res.user_id));
     Ok(api_res.user_id)
+}
+
+pub fn test(server: &Arc<Server>) -> crate::Result<()> {
+    ureq::get(format!(
+        "https://vxchat.netlify.app/api/auth-test?key={}&id={}",
+        server.config.server_key, server.config.server_id
+    ))
+    .call()
+    .context("Failed to authenticate")?;
+
+    Ok(())
 }

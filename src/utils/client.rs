@@ -1,7 +1,7 @@
 use std::{
     hash::{Hash, Hasher},
     io::{self, Read, Write},
-    net::{SocketAddr, TcpStream},
+    net::TcpStream,
 };
 
 use anyhow::anyhow;
@@ -347,9 +347,9 @@ impl Client {
         self.1 = Some(uuid.to_string())
     }
 
-    #[deprecated]
-    pub fn addr(&self) -> crate::Result<SocketAddr> {
-        Ok(self.0.peer_addr().unwrap_or(self.0.local_addr()?))
+    pub fn close(&self) -> crate::Result<()> {
+        self.0.shutdown(std::net::Shutdown::Both)?;
+        Ok(())
     }
 }
 
