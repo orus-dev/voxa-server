@@ -70,17 +70,24 @@ impl PluginLoader {
         let plugin_clients = self.plugin_clients.clone();
         let listener = TcpListener::bind("0.0.0.0:7243").unwrap();
 
+        let handle_plugin = move |stream: Result<TcpStream, std::io::Error>| -> crate::Result<()> {
+            let stream = stream?;
+            let mut reader = BufReader::new(&stream);
+            let mut s = String::new();
+            reader.read_line(&mut s)?;
+            let plugin_handshake: PluginHandshake = serde_json::from_str(&s)?;
+            plugin_clients
+                .lock()
+                .unwrap()
+                .insert(plugin_handshake.id, stream);
+            Ok(())
+        };
+
         std::thread::spawn(move || {
             for stream in listener.incoming() {
-                let stream = stream.unwrap();
-                let mut reader = BufReader::new(&stream);
-                let mut s = String::new();
-                reader.read_line(&mut s).unwrap();
-                let plugin_handshake: PluginHandshake = serde_json::from_str(&s).unwrap();
-                plugin_clients
-                    .lock()
-                    .unwrap()
-                    .insert(plugin_handshake.id, stream);
+                if let Err(e) = handle_plugin(stream) {
+                    LOGGER.error(format!("Plugin error: {e}"));
+                }
             }
         });
     }
