@@ -96,11 +96,13 @@ pub mod message {
         MessageCreate(data::Message),
 
         /// A message was edited
-        MessageUpdate(data::Message),
+        MessageUpdate {
+            message_id: i64,
+            contents: String,
+        },
 
         /// A message was deleted
         MessageDelete {
-            channel_id: String,
             message_id: i64,
         },
 

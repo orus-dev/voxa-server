@@ -62,7 +62,7 @@ impl Database {
     /// Delete a message from the DB
     pub fn edit_message(&self, message_id: i64, contents: &str) -> Result<()> {
         self.0.execute(
-            "UPDATE table_name
+            "UPDATE chat
                 SET contents = ?2
                 WHERE id = ?1;
                 ",
@@ -84,7 +84,7 @@ impl Database {
             Ok((
                 row.get::<_, i64>(0)?,    // id
                 row.get::<_, String>(1)?, // channel_id
-                row.get::<_, u32>(2)?,    // user_id
+                row.get::<_, String>(2)?, // user_id
                 row.get::<_, String>(3)?, // contents
                 row.get::<_, i64>(4)?,    // timestamp
             ))

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::{
     server::Server,
-    types::message::{ClientMessage, WsMessage},
+    types::message::{ClientMessage, ServerMessage, WsMessage},
     utils::client::Client,
 };
 
@@ -43,5 +43,18 @@ impl Server {
         }
 
         Ok(())
+    }
+
+    pub fn broadcast(self: &Arc<Self>, msg: ServerMessage) {
+        for c in self.clients.lock().unwrap().iter() {
+            let c = c.clone();
+            let server = self.clone();
+            let msg = msg.clone();
+            std::thread::spawn(move || {
+                server
+                    .wrap_err(&c, c.send(msg))
+                    .expect("Failed to broadcast");
+            });
+        }
     }
 }
