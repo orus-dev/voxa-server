@@ -94,9 +94,14 @@ impl PluginLoader {
     }
 
     pub fn load_all(&self, server: &Arc<Server>) {
+        let path = server.root.join("plugins");
+        if !path.exists() {
+            fs::create_dir(&path).unwrap();
+        }
+
         // Load plugins
         LOGGER.info("Loading plugins");
-        for entry in fs::read_dir(server.root.join("plugins")).unwrap() {
+        for entry in fs::read_dir(&path).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
 
