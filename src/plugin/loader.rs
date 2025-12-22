@@ -4,6 +4,7 @@ use crate::{
         Plugin,
         types::{PluginHandshake, PluginJson},
     },
+    server::Server,
 };
 use std::{
     collections::HashMap,
@@ -82,6 +83,31 @@ impl PluginLoader {
                     .insert(plugin_handshake.id, stream);
             }
         });
+    }
+
+    pub fn remove(&self, plugin_id: &str) {
+        self.plugin_clients.lock().unwrap().remove(plugin_id);
+    }
+
+    pub fn clear(&self) {
+        self.plugin_clients.lock().unwrap().clear();
+    }
+
+    pub fn load_all(&self, server: &Arc<Server>) {
+        // Load plugins
+        LOGGER.info("Loading plugins");
+        for entry in fs::read_dir(server.root.join("plugins")).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+
+            if path.is_dir() {
+                let mut p = self.load(&path);
+                let s = server.clone();
+                server.plugins.lock().unwrap().push(p.clone());
+                std::thread::spawn(move || p.run(&s));
+            }
+        }
+        LOGGER.info("Plugins loaded");
     }
 }
 

@@ -90,19 +90,7 @@ impl Server {
         plugin_loader.start_server();
 
         // Load plugins
-        Self::LOGGER.info("Loading plugins");
-        for entry in fs::read_dir(self.root.join("plugins"))? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.is_dir() {
-                let mut p = plugin_loader.load(&path);
-                let s = self.clone();
-                self.plugins.lock().unwrap().push(p.clone());
-                std::thread::spawn(move || p.run(&s));
-            }
-        }
-        Self::LOGGER.info("Plugins loaded");
+        plugin_loader.load_all(self);
 
         // Initialize plugins
         Self::LOGGER.info("Initializing plugins");
