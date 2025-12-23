@@ -1,5 +1,6 @@
 pub mod chunk;
 pub mod message;
+pub mod indicator;
 
 use std::sync::Arc;
 
@@ -36,8 +37,10 @@ impl Server {
                 ClientMessage::LoadChunk {
                     chunk_id,
                     channel_id,
-                } => {
-                    chunk::load_chunk(self, client, channel_id, *chunk_id)?;
+                } => chunk::load_chunk(self, client, channel_id, *chunk_id)?,
+
+                ClientMessage::Typing { channel_id } => {
+                    indicator::start_typing(self, client, channel_id)?
                 }
             },
 

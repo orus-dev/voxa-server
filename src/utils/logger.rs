@@ -33,13 +33,13 @@ impl Logger {
         }
     }
 
-    pub fn extract_panic<T, E: Display, D: Display>(&self, v: Result<T, E>, m: D) -> T {
-        match v {
-            Ok(a) => a,
-            Err(e) => {
-                self.error(format!("{m}: {e}"));
-                panic!()
-            }
-        }
-    }
+    // pub fn extract_panic<T, E: Display, D: Display>(&self, v: Result<T, E>, m: D) -> T {
+    //     match v {
+    //         Ok(a) => a,
+    //         Err(e) => {
+    //             self.error(format!("{m}: {e}"));
+    //             panic!()
+    //         }
+    //     }
+    // }
 }

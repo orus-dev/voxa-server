@@ -55,9 +55,12 @@ pub mod handshake {
 pub mod message {
     use serde::{Deserialize, Serialize};
 
-    use crate::types::{
-        Author,
-        data::{self, Message},
+    use crate::{
+        requests::indicator::IndicatorContext,
+        types::{
+            Author,
+            data::{self, Message},
+        },
     };
 
     /// Messages sent *from the client* (user’s app) to the server
@@ -85,6 +88,10 @@ pub mod message {
             channel_id: String,
             chunk_id: usize,
         },
+
+        Typing {
+            channel_id: String,
+        },
     }
 
     /// Messages sent *from the server* to the client
@@ -94,6 +101,7 @@ pub mod message {
         /// Successful authentication
         Authenticated {
             uuid: Author,
+            indicators: Vec<IndicatorContext>,
         },
 
         TempMessage {
@@ -120,11 +128,8 @@ pub mod message {
             status: String,
         },
 
-        /// Typing indicator
-        Typing {
-            user_id: Author,
-            channel_id: String,
-        },
+        /// Indicator
+        Indicator(IndicatorContext),
 
         Shutdown {
             message: String,

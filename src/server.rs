@@ -44,6 +44,7 @@ pub struct Server {
     pub plugins: Mutex<Vec<Plugin>>,
     pub db: utils::database::Database,
     pub shutting_down: AtomicBool,
+    pub indicators: Mutex<Vec<crate::requests::indicator::IndicatorContext>>,
 }
 
 impl Default for ServerConfig {
@@ -79,6 +80,7 @@ impl Server {
             clients: Mutex::new(HashSet::new()),
             plugins: Mutex::new(Vec::new()),
             shutting_down: AtomicBool::new(false),
+            indicators: Mutex::new(Vec::new()),
         })
     }
 
@@ -164,7 +166,10 @@ impl Server {
                 let uuid = self.wrap_err(&client, auth_res)?;
                 self.wrap_err(
                     &client,
-                    client.send(types::message::ServerMessage::Authenticated { uuid }),
+                    client.send(types::message::ServerMessage::Authenticated {
+                        uuid,
+                        indicators: self.indicators.lock().unwrap().clone(),
+                    }),
                 )?;
             }
             Some(v) => {

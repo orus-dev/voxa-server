@@ -16,29 +16,29 @@ pub fn dir(path: &Path) -> crate::Result<()> {
     Ok(())
 }
 
-pub fn read(path: &Path, default_content: &str) -> crate::Result<String> {
-    if !path.exists() {
-        LOGGER.info(format!(
-            "File {path:?} does not exist, creating it with default contents"
-        ));
-        write(path, default_content)?;
-        return Ok(default_content.to_string());
-    }
+// pub fn read(path: &Path, default_content: &str) -> crate::Result<String> {
+//     if !path.exists() {
+//         LOGGER.info(format!(
+//             "File {path:?} does not exist, creating it with default contents"
+//         ));
+//         write(path, default_content)?;
+//         return Ok(default_content.to_string());
+//     }
 
-    Ok(fs::read_to_string(path)?)
-}
+//     Ok(fs::read_to_string(path)?)
+// }
 
-pub fn read_bytes<'a>(path: &Path, default_content: Vec<u8>) -> crate::Result<Vec<u8>> {
-    if !path.exists() {
-        LOGGER.info(format!(
-            "File {path:?} does not exist, creating it with default contents"
-        ));
-        write_bytes(path, &default_content)?;
-        return Ok(default_content);
-    }
+// pub fn read_bytes<'a>(path: &Path, default_content: Vec<u8>) -> crate::Result<Vec<u8>> {
+//     if !path.exists() {
+//         LOGGER.info(format!(
+//             "File {path:?} does not exist, creating it with default contents"
+//         ));
+//         write_bytes(path, &default_content)?;
+//         return Ok(default_content);
+//     }
 
-    Ok(fs::read(path)?)
-}
+//     Ok(fs::read(path)?)
+// }
 
 pub fn read_config<T: Default + Serialize + for<'de> Deserialize<'de>>(
     path: &Path,
@@ -56,23 +56,23 @@ pub fn read_config<T: Default + Serialize + for<'de> Deserialize<'de>>(
     Ok(serde_json::from_str::<T>(&read)?)
 }
 
-pub fn write(path: &Path, content: &str) -> crate::Result<()> {
-    dir(path.parent().ok_or(std::io::Error::new(
-        std::io::ErrorKind::InvalidFilename,
-        "File doesn't have a parent assigned, example: `config/config.json`",
-    ))?)?;
-    fs::write(path, content)?;
-    Ok(())
-}
+// pub fn write(path: &Path, content: &str) -> crate::Result<()> {
+//     dir(path.parent().ok_or(std::io::Error::new(
+//         std::io::ErrorKind::InvalidFilename,
+//         "File doesn't have a parent assigned, example: `config/config.json`",
+//     ))?)?;
+//     fs::write(path, content)?;
+//     Ok(())
+// }
 
-pub fn write_bytes(path: &Path, content: &[u8]) -> crate::Result<()> {
-    dir(path.parent().ok_or(std::io::Error::new(
-        std::io::ErrorKind::InvalidFilename,
-        "File doesn't have a parent assigned, example: `config/config.json`",
-    ))?)?;
-    fs::write(path, content)?;
-    Ok(())
-}
+// pub fn write_bytes(path: &Path, content: &[u8]) -> crate::Result<()> {
+//     dir(path.parent().ok_or(std::io::Error::new(
+//         std::io::ErrorKind::InvalidFilename,
+//         "File doesn't have a parent assigned, example: `config/config.json`",
+//     ))?)?;
+//     fs::write(path, content)?;
+//     Ok(())
+// }
 
 pub fn write_config<T: Serialize>(path: &Path, content: &T) -> crate::Result<()> {
     dir(path.parent().ok_or(std::io::Error::new(
