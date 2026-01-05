@@ -24,7 +24,7 @@ $$ |   $$ |$$ /  $$ |\\$$\\ $$  |$$ /  $$ |
 use crate::{
     cli, logger,
     plugin::{Plugin, loader::PluginLoader, types::LoaderMessage},
-    types,
+    types::{self, message::WsMessage},
     utils::{self, auth, client::Client},
 };
 
@@ -198,10 +198,18 @@ impl Server {
         while !self.shutting_down.load(Ordering::SeqCst) {
             let req = client.read()?;
             if let Some(r) = &req {
-                self.send_plugin_message(&LoaderMessage::Request {
-                    user_id: client.get_uuid().unwrap_or_default(),
-                    msg: r.clone(),
-                })?;
+                match r {
+                    WsMessage::Binary(_) => {
+                        // ignore binary
+                    }
+                    _ => {
+                        self.send_plugin_message(&LoaderMessage::Request {
+                            user_id: client.get_uuid().unwrap_or_default(),
+                            msg: r.clone(),
+                        })?;
+                    }
+                }
+
                 self.wrap_err(&client, self.call_request(r, &client))?;
             }
         }

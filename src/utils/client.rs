@@ -199,6 +199,34 @@ impl Client {
         Ok(())
     }
 
+    /// Send a binary WebSocket frame (server -> client)
+    pub fn send_bin(&self, payload: &[u8]) -> crate::Result<()> {
+        let mut stream = self.0.try_clone()?;
+
+        let mut header = Vec::with_capacity(10);
+
+        // FIN=1, opcode=2 (binary)
+        header.push(0x82);
+
+        let len = payload.len();
+
+        if len < 126 {
+            header.push(len as u8); // mask bit = 0
+        } else if len <= 0xFFFF {
+            header.push(126);
+            header.extend_from_slice(&(len as u16).to_be_bytes());
+        } else {
+            header.push(127);
+            header.extend_from_slice(&(len as u64).to_be_bytes());
+        }
+
+        stream.write_all(&header)?;
+        stream.write_all(payload)?;
+        stream.flush()?;
+
+        Ok(())
+    }
+
     /// Read a full WebSocket message, handling fragmentation and control frames.
     ///
     /// Returns:
@@ -211,21 +239,22 @@ impl Client {
         let mut stream = self.0.try_clone()?;
 
         let mut message_payload = Vec::new();
+        let mut expecting_continuation = false;
+        let mut message_type: Option<u8> = None; // 0x1 for text, 0x2 for binary
 
         loop {
-            // read the 2-byte header
+            // Read 2-byte header
             let mut header = [0u8; 2];
-            if let Err(e) = stream.read_exact(&mut header) {
-                if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut {
-                    self.send_ping()?;
-                    continue;
-                }
-
-                if e.kind() == io::ErrorKind::UnexpectedEof || e.kind() == io::ErrorKind::BrokenPipe
-                {
-                    return Ok(None);
-                }
-                return Err(e.into());
+            match stream.read_exact(&mut header) {
+                Ok(_) => {}
+                Err(e) => match e.kind() {
+                    io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut => {
+                        self.send_ping()?;
+                        continue;
+                    }
+                    io::ErrorKind::UnexpectedEof | io::ErrorKind::BrokenPipe => return Ok(None),
+                    _ => return Err(e.into()),
+                },
             }
 
             let fin = header[0] & 0x80 != 0;
@@ -233,7 +262,7 @@ impl Client {
             let masked = header[1] & 0x80 != 0;
             let mut payload_len = (header[1] & 0x7F) as u64;
 
-            // Extended payload lengths
+            // Extended payload length
             if payload_len == 126 {
                 let mut ext_len = [0u8; 2];
                 stream.read_exact(&mut ext_len)?;
@@ -244,7 +273,7 @@ impl Client {
                 payload_len = u64::from_be_bytes(ext_len);
             }
 
-            // Mask key (client→server MUST be masked)
+            // Mask key
             let mut mask = [0u8; 4];
             if masked {
                 stream.read_exact(&mut mask)?;
@@ -265,7 +294,7 @@ impl Client {
                 }
             }
 
-            // Read payload + unmask
+            // Read payload
             let mut payload = vec![0u8; payload_len as usize];
             if payload_len > 0 {
                 stream.read_exact(&mut payload)?;
@@ -275,13 +304,45 @@ impl Client {
             }
 
             match opcode {
-                0x0 | 0x1 | 0x2 => {
-                    // Continuation / Text / Binary
+                0x0 => {
+                    // Continuation
+                    if !expecting_continuation {
+                        let _ = self.send_close(1002, "Unexpected continuation frame");
+                        return Ok(None);
+                    }
                     message_payload.extend(payload);
                     if fin {
                         break;
+                    }
+                }
+                0x1 => {
+                    // Text
+                    if expecting_continuation {
+                        let _ =
+                            self.send_close(1002, "New data frame while expecting continuation");
+                        return Ok(None);
+                    }
+                    message_payload.extend(payload);
+                    message_type = Some(0x1);
+                    if fin {
+                        break;
                     } else {
-                        continue;
+                        expecting_continuation = true;
+                    }
+                }
+                0x2 => {
+                    // Binary
+                    if expecting_continuation {
+                        let _ =
+                            self.send_close(1002, "New data frame while expecting continuation");
+                        return Ok(None);
+                    }
+                    message_payload.extend(payload);
+                    message_type = Some(0x2);
+                    if fin {
+                        break;
+                    } else {
+                        expecting_continuation = true;
                     }
                 }
                 0x8 => {
@@ -301,10 +362,12 @@ impl Client {
                     return Ok(None);
                 }
                 0x9 => {
+                    // Ping
                     self.send_pong()?;
                     continue;
                 }
                 0xA => {
+                    // Pong
                     continue;
                 }
                 _ => {
@@ -314,13 +377,20 @@ impl Client {
             }
         }
 
-        // Try parsing JSON into ClientMessage
-        let message = match String::from_utf8(message_payload.clone()) {
-            Ok(text) => match serde_json::from_str(&text) {
-                Ok(msg) => WsMessage::Message(msg),
-                Err(_) => WsMessage::String(text),
-            },
-            Err(_) => WsMessage::Binary(message_payload),
+        // Convert payload into proper message type
+        let message = match message_type {
+            Some(0x1) => {
+                // Text frame → try JSON, otherwise keep text
+                match String::from_utf8(message_payload.clone()) {
+                    Ok(text) => match serde_json::from_str(&text) {
+                        Ok(msg) => WsMessage::Message(msg),
+                        Err(_) => WsMessage::String(text),
+                    },
+                    Err(_) => WsMessage::Binary(message_payload),
+                }
+            }
+            Some(0x2) => WsMessage::Binary(message_payload),
+            _ => return Ok(None), // Should not happen
         };
 
         Ok(Some(message))
