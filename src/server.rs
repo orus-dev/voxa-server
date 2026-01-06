@@ -25,7 +25,7 @@ use crate::{
     cli, logger,
     plugin::{Plugin, loader::PluginLoader, types::LoaderMessage},
     types::{self, message::WsMessage},
-    utils::{self, auth, client::Client},
+    utils::{self, auth, client::Client, voice::Voice},
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -45,6 +45,7 @@ pub struct Server {
     pub db: utils::database::Database,
     pub shutting_down: AtomicBool,
     pub indicators: Mutex<Vec<crate::requests::indicator::IndicatorContext>>,
+    pub voice: Mutex<crate::utils::voice::Voice>,
 }
 
 impl Default for ServerConfig {
@@ -81,6 +82,7 @@ impl Server {
             plugins: Mutex::new(Vec::new()),
             shutting_down: AtomicBool::new(false),
             indicators: Mutex::new(Vec::new()),
+            voice: Mutex::new(Voice::new()),
         })
     }
 

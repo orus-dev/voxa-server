@@ -43,6 +43,9 @@ impl Server {
                 ClientMessage::Typing { channel_id } => {
                     indicator::start_typing(self, client, channel_id)?
                 }
+
+                ClientMessage::JoinVoice { channel_id } => voice::join(self, client, channel_id)?,
+                ClientMessage::LeaveVoice { channel_id } => voice::leave(self, client, channel_id)?,
             },
 
             WsMessage::Binary(data) => {
@@ -69,5 +72,28 @@ impl Server {
                     .expect("Failed to broadcast");
             });
         }
+    }
+
+    pub fn broadcast_bin_to(
+        self: &Arc<Self>,
+        targets: &[&String],
+        bytes: Vec<u8>,
+    ) -> crate::Result<()> {
+        for c in self.clients.lock().unwrap().iter() {
+            if !targets.contains(&&c.get_uuid()?) {
+                continue;
+            }
+
+            let c = c.clone();
+            let server = self.clone();
+            let bytes = bytes.clone();
+            std::thread::spawn(move || {
+                server
+                    .wrap_err(&c, c.send_bin(&bytes))
+                    .expect("Failed to broadcast");
+            });
+        }
+
+        Ok(())
     }
 }

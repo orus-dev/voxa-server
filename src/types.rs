@@ -92,6 +92,14 @@ pub mod message {
         Typing {
             channel_id: String,
         },
+
+        JoinVoice {
+            channel_id: String,
+        },
+
+        LeaveVoice {
+            channel_id: String,
+        },
     }
 
     /// Messages sent *from the server* to the client
@@ -136,6 +144,18 @@ pub mod message {
         },
 
         Chunk(Vec<Message>),
+
+        VoiceJoin {
+            user_id: String,
+            channel_id: String,
+            voice_id: u16,
+        },
+
+        VoiceLeave {
+            user_id: String,
+            channel_id: String,
+            voice_id: u16,
+        },
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
