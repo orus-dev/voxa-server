@@ -24,6 +24,7 @@ $$ |   $$ |$$ /  $$ |\\$$\\ $$  |$$ /  $$ |
 use crate::{
     cli, logger,
     plugin::{Plugin, loader::PluginLoader, types::LoaderMessage},
+    requests::voice,
     types::{self, message::WsMessage},
     utils::{self, auth, client::Client, voice::Voice},
 };
@@ -230,7 +231,21 @@ impl Server {
             if client
                 .send(types::message::ResponseError::InternalError(e.to_string()))
                 .is_err()
-            {}
+            {
+                let Ok(user_id) = client.get_uuid() else {
+                    return res;
+                };
+
+                let channel_id = {
+                    let v = self.voice.lock().unwrap();
+                    let Some((channel_id, _)) = v.find_user(&user_id) else {
+                        return res;
+                    };
+                    channel_id.clone()
+                };
+
+                voice::leave(self, client, &channel_id).unwrap();
+            }
         }
 
         res
