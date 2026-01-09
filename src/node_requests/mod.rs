@@ -12,7 +12,7 @@ use crate::{
 };
 
 impl Server {
-    pub fn call_server_request(
+    pub fn call_node_request(
         self: &Arc<Self>,
         req: &WsMessage<ClientMessage>,
         client: &Client,
@@ -61,23 +61,10 @@ impl Server {
         Ok(())
     }
 
-    pub fn broadcast(self: &Arc<Self>, msg: ServerMessage) {
-        for c in self.clients.lock().unwrap().iter() {
-            let c = c.clone();
-            let server = self.clone();
-            let msg = msg.clone();
-            std::thread::spawn(move || {
-                server
-                    .wrap_err(&c, c.send(msg))
-                    .expect("Failed to broadcast");
-            });
-        }
-    }
-
-    pub fn broadcast_bin_to(
+    pub fn broadcast_to(
         self: &Arc<Self>,
         targets: &[&String],
-        bytes: Vec<u8>,
+        message: ServerMessage,
     ) -> crate::Result<()> {
         for c in self.clients.lock().unwrap().iter() {
             if !targets.contains(&&c.get_uuid()?) {
@@ -86,10 +73,10 @@ impl Server {
 
             let c = c.clone();
             let server = self.clone();
-            let bytes = bytes.clone();
+            let message = message.clone();
             std::thread::spawn(move || {
                 server
-                    .wrap_err(&c, c.send_bin(&bytes))
+                    .wrap_err(&c, c.send(&message))
                     .expect("Failed to broadcast");
             });
         }

@@ -129,6 +129,41 @@ impl Database {
 
         Ok(messages)
     }
+
+    pub fn get_chunk_node(
+        &self,
+        author: &str,
+        channel_id: &str,
+        chunk_id: usize,
+    ) -> Result<Vec<Message>> {
+        let mut stmt = self.0.prepare(
+            "SELECT id, channel_id, user_id, contents, timestamp
+            FROM chat
+            WHERE (
+                (channel_id = ?1 AND user_id = ?3)
+             OR (channel_id = ?3 AND user_id = ?1)
+            )
+            ORDER BY id DESC
+            LIMIT 16 OFFSET (?2 * 16)",
+        )?;
+
+        let rows = stmt.query_map(params![channel_id, chunk_id, author], |row| {
+            Ok(Message {
+                id: row.get::<_, i64>(0)?,
+                channel_id: row.get::<_, String>(1)?,
+                from: row.get::<_, String>(2)?,
+                contents: row.get::<_, String>(3)?,
+                timestamp: row.get::<_, i64>(4)?,
+            })
+        })?;
+
+        let mut messages = Vec::new();
+        for row in rows {
+            messages.push(row?);
+        }
+
+        Ok(messages)
+    }
 }
 
 unsafe impl Send for Database {}

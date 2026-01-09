@@ -8,24 +8,22 @@ use std::{
     },
 };
 
-const WELCOME: &str = "
-
-$$\\    $$\\  $$$$$$\\  $$\\   $$\\  $$$$$$\\  
-$$ |   $$ |$$  __$$\\ $$ |  $$ |$$  __$$\\ 
-$$ |   $$ |$$ /  $$ |\\$$\\ $$  |$$ /  $$ |
-\\$$\\  $$  |$$ |  $$ | \\$$$$  / $$$$$$$$ |
- \\$$\\$$  / $$ |  $$ | $$  $$<  $$  __$$ |
-  \\$$$  /  $$ |  $$ |$$  /\\$$\\ $$ |  $$ |
-   \\$  /    $$$$$$  |$$ /  $$ |$$ |  $$ |
-    \\_/     \\______/ \\__|  \\__|\\__|  \\__|
-
-";
+const WELCOME: &str = "\x1b[38;2;169;86;252m
+    _          _                 
+   / \\   __  _(_) ___  _ __ ___  
+  / _ \\  \\ \\/ / |/ _ \\| '_ ` _ \\ 
+ / ___ \\  >  <| | (_) | | | | | |
+/_/   \\_\\/_/\\_\\_|\\___/|_| |_| |_|
+\x1b[0m";
 
 use crate::{
     cli, logger,
     plugin::{Plugin, loader::PluginLoader, types::LoaderMessage},
     requests::voice,
-    types::{self, message::WsMessage},
+    types::{
+        self,
+        message::{ClientMessage, WsMessage},
+    },
     utils::{self, auth, client::Client, voice::Voice},
 };
 
@@ -47,6 +45,7 @@ pub struct Server {
     pub shutting_down: AtomicBool,
     pub indicators: Mutex<Vec<crate::requests::indicator::IndicatorContext>>,
     pub voice: Mutex<crate::utils::voice::Voice>,
+    pub call_request: fn(&Arc<Self>, &WsMessage<ClientMessage>, &Client) -> crate::Result<()>,
 }
 
 impl Default for ServerConfig {
@@ -66,6 +65,14 @@ impl ServerConfig {
         Server::new_config(root, self)
     }
 
+    pub fn build_req(
+        self,
+        root: &Path,
+        req: fn(&Arc<Server>, &WsMessage<ClientMessage>, &Client) -> crate::Result<()>,
+    ) -> Arc<Server> {
+        Server::new_req_config(root, req, self)
+    }
+
     pub fn from_str(s: &str) -> std::result::Result<Self, serde_json::Error> {
         serde_json::from_str(s)
     }
@@ -73,6 +80,24 @@ impl ServerConfig {
 
 impl Server {
     logger!(LOGGER "Server");
+
+    pub fn new_req_config(
+        root: &Path,
+        call_request: fn(&Arc<Self>, &WsMessage<ClientMessage>, &Client) -> crate::Result<()>,
+        config: ServerConfig,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            db: utils::database::Database::new(&config).unwrap(),
+            root: root.to_path_buf(),
+            config,
+            clients: Mutex::new(HashSet::new()),
+            plugins: Mutex::new(Vec::new()),
+            shutting_down: AtomicBool::new(false),
+            indicators: Mutex::new(Vec::new()),
+            voice: Mutex::new(Voice::new()),
+            call_request: call_request,
+        })
+    }
 
     pub fn new_config(root: &Path, config: ServerConfig) -> Arc<Self> {
         Arc::new(Self {
@@ -84,6 +109,7 @@ impl Server {
             shutting_down: AtomicBool::new(false),
             indicators: Mutex::new(Vec::new()),
             voice: Mutex::new(Voice::new()),
+            call_request: Self::call_server_request,
         })
     }
 
@@ -214,7 +240,7 @@ impl Server {
                     }
                 }
 
-                self.wrap_err(&client, self.call_request(r, &client))?;
+                self.wrap_err(&client, (self.call_request)(self, r, &client))?;
             }
         }
         Ok(())

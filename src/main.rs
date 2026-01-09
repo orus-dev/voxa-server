@@ -1,5 +1,6 @@
 mod cli;
 mod macros;
+mod node_requests;
 mod plugin;
 mod requests;
 mod server;
@@ -22,6 +23,17 @@ fn main() -> Result<()> {
     } else {
         vfs::read_config(&root.join("config.json"))?
     };
+
+    if let Ok(a) = std::env::var("AXIOM_NODE") {
+        if a == "true" {
+            config
+                .build_req(&root, crate::server::Server::call_node_request)
+                .run()?;
+
+            return Ok(());
+        }
+    }
+
     config.build(&root).run()?;
     Ok(())
 }

@@ -1,10 +1,10 @@
-# voxa-server
+# axiom-server
 
-Self host your voxa community server with customizable plugins
+Self host your axiom community server with customizable plugins
 
 # Protocol
 
-1. When the client is running in the background or windowed, it's connected to the [Voxa Cloud server](#voxa-cloud)
+1. When the client is running in the background or windowed, it's connected to the [Axiom Cloud server](#axiom-cloud)
 
 ## Handshake
 
@@ -28,6 +28,6 @@ Server -> Cloud: `POST /message { content: <Message>, author: <User-Id> }`
 
 Cloud -> Client(s): `{ Message: { content: <Message>, author: <User-Id> } }`
 
-# Voxa Cloud
+# Axiom Cloud
 
-The voxa cloud server is the main auth and notification handler.
+The axiom cloud server is the main auth and notification handler.
