@@ -139,7 +139,10 @@ impl Database {
         let mut stmt = self.0.prepare(
             "SELECT id, channel_id, user_id, contents, timestamp
             FROM chat
-            WHERE channel_id = ?1 AND user_id = ?3
+            WHERE (
+                (channel_id = ?1 AND user_id = ?3)
+             OR (channel_id = ?3 AND user_id = ?1)
+            )
             ORDER BY id DESC
             LIMIT 16 OFFSET (?2 * 16)",
         )?;
